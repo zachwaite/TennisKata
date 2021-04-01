@@ -1,7 +1,7 @@
 module Game
 
 type GameState =
-    | LoveAll          // 0, 0 - initial state
+    | LoveAll           // 0, 0 - initial state
     | LoveFifteen       // 0, 15
     | FifteenLove       // 15, 0
     | LoveThirty        // 0, 30
