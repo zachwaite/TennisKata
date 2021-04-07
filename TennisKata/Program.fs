@@ -1,11 +1,4 @@
-﻿open Game
- 
-let accumulate
-    (init:GameState)
-    (pointWinners:PointWinEvent list): GameState =
-    pointWinners |> List.fold evolveGameState init
-    
-let accumulate' = accumulate LoveAll
+﻿open TennisKata.Tiebreak
 
 
 let shouldOutput expected observed: unit =
@@ -16,19 +9,6 @@ let shouldOutput expected observed: unit =
 
 [<EntryPoint>]
 let main _ =
-    [
-        Player1
-        Player1
-        Player1
-        Player2
-        Player2
-        Player2
-        Player1
-        Player2
-        Player2
-        Player2
-        Player2
-    ]
-    |> accumulate'
-    |> shouldOutput WinnerPlayer2
+    decide (GameInProgress {Player1=0;Player2=0}) (ScorePoint (ScoringPlayer.from Player1))
+    |> printfn "%A"
     0
