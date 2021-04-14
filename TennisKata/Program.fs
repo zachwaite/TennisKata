@@ -1,7 +1,4 @@
-﻿open System
-open TennisKata
-
-type Player =
+﻿type Player =
     | Player1
     | Player2
 
@@ -69,6 +66,12 @@ module RegularGame =
         | Advantage Player2, Player2 -> GameWon Player2
         | GameWon _, _ -> failwith "The game has concluded."
 
+    let tryRegisterOutcome state ballWinner: State option =
+        try
+            Some (registerOutcome state ballWinner)
+        with
+        | _ -> None
+
 module TieBreak =
     type Score = { Player1: uint; Player2: uint }
 
@@ -113,6 +116,12 @@ module TieBreak =
             failwith
                 "It's not possible to update the points during this state of the game."
 
+    let tryRegisterOutcome state ballWinner: State option =
+        try
+            Some (registerOutcome state ballWinner)
+        with
+        | _ -> None
+
 
 module Set =
     type Score = { Player1: uint; Player2: uint }
@@ -121,7 +130,15 @@ module Set =
         | Score of Score
         | Won of Player
 
+    type CurrentGameState =
+        | RegularGame of RegularGame.State
+        | TiebreakGame of TieBreak.State
+        | NoMoreGames
+
+    type SetAndGameState = { SetState:State; CurrentGameState:CurrentGameState }
+
     let start () = Score { Player1 = 0u; Player2 = 0u }
+    let init () = {SetState=Score{ Player1=0u; Player2=0u; }; CurrentGameState=RegularGame (RegularGame.start())}
 
     let private (|Leads|_|) player score =
         match player, score with
@@ -137,6 +154,11 @@ module Set =
         match player, score with
         | Player1, { Player1 = score } when score >= 5u -> Some()
         | Player2, { Player2 = score } when score >= 5u -> Some()
+        | _ -> None
+
+    let private (|Tie66|_|) state =
+        match state with
+        | Score { Player1=6u; Player2=6u; } -> Some()
         | _ -> None
 
     let private updateScore score gameWinner =
@@ -159,37 +181,49 @@ module Set =
             failwith
                 "It's not possible to update the points during this state of the game."
 
-let registerOutcome state gameWinner =
-    let newState = Set.registerOutcome state gameWinner
-    Console.WriteLine newState
-    newState
+    let tryRegisterOutcome state gameWinner =
+        try
+            Some(registerOutcome state gameWinner)
+        with
+        | _ -> None
 
-let handleBallWinner state ballWinner =
-    // zzz
-    
-    
+    let nextGameState (currentSetState:State) (currentGameState:CurrentGameState) (ballWinner:Player): CurrentGameState option =
+        match currentGameState with
+        | RegularGame s -> 
+            match (RegularGame.tryRegisterOutcome s ballWinner) with
+            | Some ss -> Some (RegularGame ss)
+            | None ->
+                match currentSetState with
+                | Tie66 -> Some(TiebreakGame (TieBreak.start ()))
+                | _ -> Some(RegularGame (RegularGame.start ()))
+        | TiebreakGame s ->
+            match  (TieBreak.tryRegisterOutcome s ballWinner) with
+            | Some ss -> Some (TiebreakGame ss)
+            | None -> None
+        | NoMoreGames -> Some NoMoreGames
+
+    let nextSetState (currentGameState:CurrentGameState) (currentSetState:State) (ballWinner:Player): State option =
+        let nextGame = nextGameState currentSetState currentGameState ballWinner
+        match nextGame with
+        | None -> tryRegisterOutcome currentSetState ballWinner
+        | Some _ -> Some currentSetState
+
+    let handleBallWinner (state:SetAndGameState) ballWinner: SetAndGameState =
+        let maybeNextGame = nextGameState state.SetState state.CurrentGameState ballWinner
+        let maybeNextState = nextSetState state.CurrentGameState state.SetState ballWinner
+
+        match maybeNextState with
+        | Some s -> 
+            match maybeNextGame with
+            | Some g -> { SetState=s; CurrentGameState=g }
+            | None -> failwith "should have a game here"
+        | None -> failwith "should have a set here"
 
 [<EntryPoint>]
 let main _ =
-    Array.fold
-        registerOutcome
-        (Set.start ())
-        [|
-          RegularGame.registerOutcome (RegularGame.start ()) [ Player1; Player1; Player1 ]
-           Player1
-           Player1
-           Player1
-           Player1
-           Player2
-           Player2
-           Player2
-           Player2
-           Player2
-           Player2
-           Player1
-           Tiebreak.registerOutcome (RegularGame.start ()) [ Player1; Player1; Player1 ] |]
-    |> ignore
-
+    let handle' = Set.handleBallWinner (Set.init ())
+    handle' Player1
+    |> printfn "%A"
     0
 
 // consume a sequence of ballWinner
