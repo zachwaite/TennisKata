@@ -8,6 +8,7 @@
     <ItemGroup>
         <Compile Include="Game.fs" />
         <Compile Include="Tiebreak.fs" />
+        <Compile Include="TiebreakGame.fs" />
         <Compile Include="Program.fs" />
         <Content Include="Kata.txt" />
     </ItemGroup>
