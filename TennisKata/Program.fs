@@ -1,7 +1,4 @@
-﻿open TennisKata
-open TennisKata.Tiebreak
-
-type Player =
+﻿type Player =
     | Player1
     | Player2
 
@@ -173,6 +170,7 @@ module SetTracking =
     type GameState =
         | RegularGameState of RegularGame.State
         | TiebreakGameState of TieBreak.State
+        | NoMoreGames
 
     type SetState = SetState of Set.State
 
@@ -184,9 +182,10 @@ module SetTracking =
         { GameState = (RegularGameState(RegularGame.start ()))
           SetState = SetState(Set.start ()) }
      
-    let (|ShouldBeginTiebreak|ShouldBeginRegular|) (setState) =
+    let (|ShouldBeginTiebreak|ShouldBeginRegular|ShouldNotBegin|) setState =
         match setState with
         | Set.State.Tiebreak -> ShouldBeginTiebreak
+        | Set.State.Won _ -> ShouldNotBegin
         | _ -> ShouldBeginRegular
     
     let registerOutcome state ballWinner =
@@ -199,6 +198,7 @@ module SetTracking =
                     RegularGameState (RegularGame.registerOutcome x ballWinner)
                 | TiebreakGameState x ->
                     TiebreakGameState (TieBreak.registerOutcome x ballWinner)
+                | NoMoreGames -> failwith "Impossible destination"
             let (SetState setState) = state.SetState        
             match newGameState with
             | RegularGameState (RegularGame.State.GameWon player) ->
@@ -210,6 +210,9 @@ module SetTracking =
                  | ShouldBeginTiebreak ->
                      { SetState=SetState (Set.registerOutcome setState player);
                        GameState=TiebreakGameState(TieBreak.start ())}
+                 | ShouldNotBegin ->
+                     { SetState=SetState (Set.registerOutcome setState player);
+                       GameState=NoMoreGames }
             | RegularGameState _ ->
                  { state with GameState=newGameState; }
             | TiebreakGameState (TieBreak.State.Won player) ->
@@ -221,8 +224,12 @@ module SetTracking =
                  | ShouldBeginTiebreak ->
                      { SetState=SetState (Set.registerOutcome setState player);
                        GameState=TiebreakGameState(TieBreak.start ())}
+                 | ShouldNotBegin ->
+                     { SetState=SetState (Set.registerOutcome setState player);
+                       GameState=NoMoreGames }
             | TiebreakGameState _ ->
                  { state with GameState=newGameState; }
+            | NoMoreGames -> failwith "Impossible Destination"
 
 // Switch into Tiebreak when set score = 6 to 6
 // After tiebreak game concludes, switch back to regular games
@@ -236,7 +243,7 @@ let main _ =
     let winTiebreakPlayer1 = [Player1;Player1;Player1;Player1;Player1;Player1;Player1;]
     let win5Player1 = winPlayer1 @ winPlayer1 @ winPlayer1 @ winPlayer1 @ winPlayer1
     let win5Player2 = winPlayer2 @ winPlayer2 @ winPlayer2 @ winPlayer2 @ winPlayer2
-    win5Player1 @ win5Player2 @ winPlayer1 @ winPlayer2 @ winTiebreakPlayer1
+    win5Player1 @ win5Player2 @ winPlayer1 @ winPlayer2 @ winTiebreakPlayer1 @ winPlayer1
     |> List.fold SetTracking.registerOutcome (SetTracking.start ())
     |> printfn "%A"
     0
